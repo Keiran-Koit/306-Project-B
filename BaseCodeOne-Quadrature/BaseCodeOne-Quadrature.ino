@@ -32,6 +32,16 @@ int repeat = 0;  //repeat indicator to only let the memory of time for the Purpo
 // Custom variable declarations
 
 int sensorValue = A0;
+int Sensor1 = A5;
+int Sensor2 = A4;
+int analogSensor1, analogSensor2;
+bool currSensor1, currSensor2;
+bool prevSensor1 = false;
+bool prevSensor2 = false;
+int threshold 400;
+double edgeCount = 0;
+double avgSpeed;
+String dirn = "CW";
 
 // End of custom variable declarations
 //--------------------------------------------------------------------
@@ -71,14 +81,31 @@ void loop() {
 
   while ((b >= c) && (b <= (c + 15500)) && exitt == 0)  //let the main loop to be run for 15s
   {
+    //--------------------------------------------------------------------
     // Custom Code
-    float volts = analogRead(sensorValue) * 5.0 / 1024.0;  //10-bit ADC
-    Serial.print("analogyADC ");
-    Serial.print(analogRead(sensorValue));
-    Serial.print(" ");
-    Serial.print("A0 = ");
-    Serial.println(volts);
+    
+    // Speed calculations
+    if ((b >= (c + 3000)) && (b <= (c + 13000))){       // Only read the speed for the middle 10 seconds of spin
+      analogSensor1 = analogRead(Sensor1);
+      analogSensor2 = analogRead(Sensor2);
+      currSensor1 = (analogSensor1 > threshold) ? true : false;
+      currSensor2 = (analogSensor2 > threshold) ? true : false;
+      (currSensor1 != prevSensor1) ? edgeCount++;         // If sensor 1 has seen an edge, increase the count
+      (currSensor2 != prevSensor2) ? edgeCount++;         // If sensor 2 has seen an edge, increase the count
+      prevSensor1 = currSensor1;
+      prevSensor2 = currSensor2;
+    }
+
+    // Direction calculations
+    if (b <= 500){          // Determine direction in the first half a second
+      // Need to mount it before I can write the code for this.
+    }
+
+    // Random testing
+    Serial.println("Analog value: " + analogRead(sensorValue));
+    
     // End of custom code
+    //--------------------------------------------------------------------
 
     if (b % 13 == 0 && repc == 1)  //PI controller
     {
@@ -170,5 +197,18 @@ void loop() {
     b = millis();  //updating time
   }
   analogWrite(6, 0);  //turning off the motor
+
+  //--------------------------------------------------------------------
+  // Custom code
+  
+  if (exitt == 0) {       // Only output the speed once
+    avgSpeed = ((edgeCount / 32) / 10) / 60;  // 32 edges per revolutions, measured over 10 seconds, converted to rpm
+    Serial.print("The measured speed was: " + avgSpeed + " rpm, ");
+    Serial.println("turning " + dirn);
+  }
+
+  // End of custom code
+  //--------------------------------------------------------------------
+
   exitt = 1;          //changing the exit condition to prevent the motor to run after 15s
 }
