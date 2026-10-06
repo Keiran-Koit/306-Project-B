@@ -1,4 +1,3 @@
-//--------------------------------------------------------------------
 // Base code variable declarations
 
 float deg=45; // Rotation degree
@@ -16,8 +15,10 @@ int finish=0;  //finish indicator
 int rep=1;     //Repetition indicator
 
 // End of base code variable declarations
-//-------------------- ------------------------------------------------
+/* -------------------------------------------------------------------- */
 // Custom variable declarations
+
+#define THRESHOLD 150
 
 byte grayCode[] = {
   0b00000, 0b00001, 0b00011, 0b00010, 0b00110, 0b00111, 0b00101, 0b00100,
@@ -31,14 +32,17 @@ int Sensor3 = A2;
 int Sensor4 = A3;
 int Sensor5 = A4; // Outermost Sensor
 int sensor1val, sensor2val, sensor3val, sensor4val, sensor5val;
-byte startPos, endPos;
-int threshold 400;
+byte startPos = 0;
+byte prevPos = 0;
+byte currPos = 0;
+byte endPos = 0;
+int prevIndex, currIndex;
+double absTheta, relTheta;
+String dirn;
 
 // End of custom variables
-//--------------------------------------------------------------------
 
 void setup() {
-  //--------------------------------------------------------------------
   // Base code setup
   
   Serial.begin(250000);                                                 //Baud rate of communication 
@@ -54,7 +58,7 @@ void setup() {
   deg=abs(deg);
   
   // End of base code setup
-  //--------------------------------------------------------------------
+  /* -------------------------------------------------------------------- */
   // Custom setup
 
   sensor1val = analogRead(Sensor1);
@@ -62,27 +66,36 @@ void setup() {
   sensor3val = analogRead(Sensor3);
   sensor4val = analogRead(Sensor4);
   sensor5val = analogRead(Sensor5);
-  startPos |= ((sensor1val > threshold) ? 1 : 0) << 5;
-  startPos |= ((sensor2val > threshold) ? 1 : 0) << 4;
-  startPos |= ((sensor3val > threshold) ? 1 : 0) << 3;
-  startPos |= ((sensor4val > threshold) ? 1 : 0) << 2;
-  startPos |= ((sensor5val > threshold) ? 1 : 0) << 1;
+  startPos |= ((sensor1val > THRESHOLD) ? 1 : 0) << 5;
+  startPos |= ((sensor2val > THRESHOLD) ? 1 : 0) << 4;
+  startPos |= ((sensor3val > THRESHOLD) ? 1 : 0) << 3;
+  startPos |= ((sensor4val > THRESHOLD) ? 1 : 0) << 2;
+  startPos |= ((sensor5val > THRESHOLD) ? 1 : 0) << 1;
+  currPos = startPos;
+  for (int i = 0; i < 32; i++){
+    if (grayCode[i] == currPos){
+      currIndex = i;
+      break;
+    }
+  }
+  absTheta = currIndex * 11.25;
   Serial.println(startPos, BIN); // FOR TESTING PURPOSES, printing the startpos
 
   // End of custom setup
-  //--------------------------------------------------------------------
 }
 
 float kp = .6*90/deg;                         //proportional gain of PI
 float ki = .02;                               //integral gain of PI 
 
 
-void loop() {
-  //--------------------------------------------------------------------
-  // Base code
-  
+void loop() {  
   t=millis();                 //reading time
   t0=t;                       //saving the current time in memory
+
+  // Custom code
+  prevPos = currPos;
+  prevIndex = currIndex;
+  // End of custom code
   
   while (t<t0+4000 && rep<=10) {              // let the code run for 4 seconds each with 10 repetitions
     if (t%10 == 0) {                //PI controller that runs every 10ms 
@@ -91,12 +104,10 @@ void loop() {
         eri = eri + er;
         analogWrite(6, kp * er + ki * eri);
       }
-
       if (s >= deg * 228/360) {
         analogWrite(6, 0);
         eri = 0;
       }
-
       delay(1);
     }
 
@@ -106,8 +117,7 @@ void loop() {
     if (sm1 != sm2 && r == 0) {                     //counting the number changes for both chanels
       s = s + 1;
       r = 1;                    // this indicator wont let this condition, (sm1 != sm2), to be counted until the next condition, (sm1 == sm2), happens
-    }
-    if (sm1 == sm2 && r == 1) {
+    } if (sm1 == sm2 && r == 1) {
       s = s + 1;
       r = 0;                    // this indicator wont let this condition, (sm1 == sm2), to be counted until the next condition, (sm1 != sm2), happens
     }
@@ -115,35 +125,51 @@ void loop() {
     t=millis();           //updating time
     finish=1;             //changing finish indicator
   }
+  
+  // Custom sensing
+
+  sensor1val = analogRead(Sensor1);
+  sensor2val = analogRead(Sensor2);
+  sensor3val = analogRead(Sensor3);
+  sensor4val = analogRead(Sensor4);
+  sensor5val = analogRead(Sensor5);
+  currPos |= ((sensor1val > THRESHOLD) ? 1 : 0) << 5;
+  currPos |= ((sensor2val > THRESHOLD) ? 1 : 0) << 4;
+  currPos |= ((sensor3val > THRESHOLD) ? 1 : 0) << 3;
+  currPos |= ((sensor4val > THRESHOLD) ? 1 : 0) << 2;
+  currPos |= ((sensor5val > THRESHOLD) ? 1 : 0) << 1;
+  for (int i = 0; i < 32; i++){
+    if (grayCode[i] == currPos){
+      currIndex = i;
+      break;
+    }
+  }
+
+  absTheta = currIndex * 11.25;
+  relTheta = (currIndex - prevIndex) * 11.25;
+  dirn = (relTheta > 0) ? "CW" : "CCW"; // NEED TO CHECK THESE DIRECTIONS
+
+  // End of custom sensing
 
   if (finish==1){                                //this part of the code is for displaying the result
     delay(500);                              //half second delay
     rep=rep+1;                               // increasing the repetition indicator
     Serial.print("shaft position from optical absolute sensor from home position: ");
-    Serial.println(0);
+    Serial.println(absTheta);
       
     Serial.print("shaft displacement from optical absolute sensor: ");
-    Serial.println(0);
+    Serial.print(relTheta);
+    Serial.println(" , direction: " + dirn);
       
     Serial.print("Shaft displacement from motor's builtin encoder: ");
     Serial.println(s * 360 / 228);                                      //every full Revolution of the shaft is associated with 228 counts of builtin 
                                                                           //encoder so to turn it to degre we can use this formula (s * 360 / 228), "s" is the number of  built-in encoder counts
-    float Error=0-s*360/228;
+    float Error=relTheta-s*360/228;
     Serial.print("Error :");
     Serial.println(Error);                                              //displaying error
     Serial.println();
     s = 0;
     finish=0; 
   }
-  
   analogWrite(6,0);                                                         //turning off the motor
-  
-  // End of base code
-  //--------------------------------------------------------------------
-  // Custom code
-  
-  Serial.println()
-  
-  // End of custom code
-  //--------------------------------------------------------------------
 }

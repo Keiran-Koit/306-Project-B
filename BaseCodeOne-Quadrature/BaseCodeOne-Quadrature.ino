@@ -32,6 +32,7 @@ int repeat = 0;  //repeat indicator to only let the memory of time for the Purpo
 // Custom variable declarations
 
 #define THRESHOLD 150
+
 int Sensor1 = A5;       // Bottom (only quad)
 int Sensor2 = A4;       // Top (used in both quad and absolute)
 int analogSensor1, analogSensor2;
@@ -84,32 +85,31 @@ void loop() {
   while ((b >= c) && (b <= (c + 15500)) && exitt == 0)  //let the main loop to be run for 15s
   {
     /* -------------------------------------------------------------------- */
-    // Custom Code
+    // Custom sensing
 
-    // Speed calculations
-      analogSensor1 = analogRead(Sensor1);
-      analogSensor2 = analogRead(Sensor2);
-      currSensor1 = (analogSensor1 > THRESHOLD) ? true : false;     // Sensor true if it's seeing light
-      currSensor2 = (analogSensor2 > THRESHOLD) ? true : false;
-      (currSensor1 != prevSensor1) ? edgeCount++ : edgeCount += 0;         // If sensor has seen an edge, increase the count
-      (currSensor2 != prevSensor2) ? edgeCount++ : edgeCount += 0;
-      
-      // Direction calculations
-      if (currSensor1 && !prevSensor1) {                // Sensor 1 rising edge
-        (currSensor2) ? cwCount++ : ccwCount++;
-      } else if (!currSensor1 && prevSensor1) {         // Sensor 1 falling edge
-        (currSensor2) ? ccwCount++ : cwCount++;
-      }
-      if (currSensor2 && !prevSensor2) {                // Sensor 2 rising edge
-        (currSensor1) ? ccwCount++ : cwCount++;
-      } else if (!currSensor2 && prevSensor2) {         // Sensor 2 falling edge
-        (currSensor1) ? cwCount++ : ccwCount++;
-      }
+    analogSensor1 = analogRead(Sensor1);
+    analogSensor2 = analogRead(Sensor2);
+    currSensor1 = (analogSensor1 > THRESHOLD) ? true : false;       // Sensor true if it's seeing light
+    currSensor2 = (analogSensor2 > THRESHOLD) ? true : false;
+    (currSensor1 != prevSensor1) ? edgeCount++ : edgeCount += 0;    // If sensor has seen an edge, increase the count
+    (currSensor2 != prevSensor2) ? edgeCount++ : edgeCount += 0;
+    
+    // Direction calculations
+    if (currSensor1 && !prevSensor1) {                // Sensor 1 rising edge
+      (currSensor2) ? cwCount++ : ccwCount++;
+    } else if (!currSensor1 && prevSensor1) {         // Sensor 1 falling edge
+      (currSensor2) ? ccwCount++ : cwCount++;
+    }
+    if (currSensor2 && !prevSensor2) {                // Sensor 2 rising edge
+      (currSensor1) ? ccwCount++ : cwCount++;
+    } else if (!currSensor2 && prevSensor2) {         // Sensor 2 falling edge
+      (currSensor1) ? cwCount++ : ccwCount++;
+    }
 
-      prevSensor1 = currSensor1;
-      prevSensor2 = currSensor2;
+    prevSensor1 = currSensor1;
+    prevSensor2 = currSensor2;
 
-    // End of custom code
+    // End of custom sensing
     /* -------------------------------------------------------------------- */
 
     if (b % 13 == 0 && repc == 1)  //PI controller
@@ -157,11 +157,12 @@ void loop() {
         Serial.print("RPM from builtin encoder: ");
         Serial.println((s / (228)) * 12);  //formula for rpm in each 5s
 
+        avgSpeed = ((edgeCount / 32) / ((b-c)/1000)) * 60;    // 32 edges per revolutions, divided by elapsed time in seconds, converted to rpm
         Serial.print("RPM from optical quadrature encoder: ");
-        Serial.println(0);
+        Serial.println(avgSpeed);
 
         Serial.print("Error: ");
-        Serial.println(blahblah-(s / (228)) * 12);
+        Serial.println(avgSpeed - (s / (228)) * 12);
 
         Serial.print("direction read by motor's sensor: ");
         if (dirm == 0) {
@@ -171,8 +172,9 @@ void loop() {
         }
         Serial.print("  ,   ");
 
+        dirn = (cwCount > ccwCount) ? "CW" : "CCW";   // Checking motor direction
         Serial.print("direction read by sensor:  ");
-        Serial.println("");
+        Serial.println(dirn);
         Serial.println();
 
         s = 0;
@@ -205,7 +207,7 @@ void loop() {
 
   //--------------------------------------------------------------------
   // Custom code
-  
+  /*
   if (exitt == 0) {       // Only output the speed once
     avgSpeed = ((edgeCount / 32) / 10) * 60;  // 32 edges per revolutions, measured over 10 seconds, converted to rpm
     Serial.print("edge count: ");
@@ -216,7 +218,7 @@ void loop() {
     dirn = (cwCount > ccwCount) ? "CW" : "CCW";
     Serial.println("turning " + dirn);
   }
-
+*/
   // End of custom code
   //--------------------------------------------------------------------
 
