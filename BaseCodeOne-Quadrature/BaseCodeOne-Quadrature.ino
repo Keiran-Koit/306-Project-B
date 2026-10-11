@@ -52,8 +52,8 @@ void setup() {
   /* -------------------------------------------------------------------- */
   // Custom setup
   
-  pinMode(A4, INPUT);
-  pinMode(A5, INPUT);
+  pinMode(Sensor2, INPUT);
+  pinMode(Sensor1, INPUT);
   
   // End of custom setup
   /* -------------------------------------------------------------------- */
@@ -157,9 +157,10 @@ void loop() {
         Serial.print("RPM from builtin encoder: ");
         Serial.println((s / (228)) * 12);  //formula for rpm in each 5s
 
-        avgSpeed = ((edgeCount / 32) / ((b-c)/1000)) * 60;    // 32 edges per revolutions, divided by elapsed time in seconds, converted to rpm
+        avgSpeed = ((edgeCount / 32) / 5) * 60;    // 32 edges per revolutions, measured over 5s, converted to rpm
         Serial.print("RPM from optical quadrature encoder: ");
         Serial.println(avgSpeed);
+        edgeCount = 0;      // Resetting the edge count after each 5s interval
 
         Serial.print("Error: ");
         Serial.println(avgSpeed - (s / (228)) * 12);
