@@ -45,6 +45,8 @@ byte endPos = 0b00000000;
 int prevIndex, currIndex;
 double absTheta, relTheta;
 String dirn;
+float tenErrors[10];
+bool printAvg = true;
 
 // End of custom variables
 
@@ -143,11 +145,11 @@ void loop() {
     sensor3val = analogRead(Sensor3);
     sensor4val = analogRead(Sensor4);
     sensor5val = analogRead(Sensor5);
-    (sensor1val > THRESHOLD) ? currPos |= (1 << 4) : currPos &= ~(1 << 4);
-    (sensor2val > THRESHOLD) ? currPos |= (1 << 3) : currPos &= ~(1 << 3);
+    (sensor1val > THRESHOLD) ? currPos |= (1 << 0) : currPos &= ~(1 << 0);
+    (sensor2val > THRESHOLD) ? currPos |= (1 << 1) : currPos &= ~(1 << 1);
     (sensor3val > THRESHOLD) ? currPos |= (1 << 2) : currPos &= ~(1 << 2);
-    (sensor4val > THRESHOLD) ? currPos |= (1 << 1) : currPos &= ~(1 << 1);
-    (sensor5val > THRESHOLD) ? currPos |= (1 << 0) : currPos &= ~(1 << 0);
+    (sensor4val > THRESHOLD) ? currPos |= (1 << 3) : currPos &= ~(1 << 3);
+    (sensor5val > THRESHOLD) ? currPos |= (1 << 4) : currPos &= ~(1 << 4);
     for (int i = 0; i < 32; i++) {
       if (grayCode[i] == currPos) {
         currIndex = i;
@@ -156,28 +158,61 @@ void loop() {
     }
 
     absTheta = currIndex * 11.25;
-    relTheta = (currIndex - prevIndex) * 11.25;
-    dirn = (relTheta > 0) ? "CCW" : "CW";  // NEED TO CHECK THESE DIRECTIONS
+    if ((currIndex - prevIndex) > 16) {
+      relTheta = (currIndex - prevIndex - 32) * 11.25;
+    } else if ((currIndex - prevIndex) < -16) {
+      relTheta = (currIndex - prevIndex + 32) * 11.25;
+    } else {
+      relTheta = (currIndex - prevIndex) * 11.25;
+    }
+    dirn = (relTheta > 0) ? "CW" : "CCW";  // NEED TO CHECK THESE DIRECTIONS
 
     // End of custom sensing
-    Serial.println(currIndex);
 
     Serial.print("shaft position from optical absolute sensor from home position: ");
     Serial.println(absTheta);
 
     Serial.print("shaft displacement from optical absolute sensor: ");
-    Serial.print(relTheta);
+    Serial.print(abs(relTheta));
     Serial.println(" , direction: " + dirn);
 
     Serial.print("Shaft displacement from motor's builtin encoder: ");
     Serial.println(s * 360 / 228);  //every full Revolution of the shaft is associated with 228 counts of builtin
                                     //encoder so to turn it to degre we can use this formula (s * 360 / 228), "s" is the number of  built-in encoder counts
-    float Error = relTheta - s * 360 / 228;
+    float Error = abs(relTheta) - s * 360 / 228;
     Serial.print("Error :");
     Serial.println(Error);  //displaying error
     Serial.println();
     s = 0;
     finish = 0;
+
+    tenErrors[rep - 2] = abs(Error);
   }
   analogWrite(6, 0);  //turning off the motor
+  if(printAvg && rep == 11) {
+    int biggest = 0;
+    for (int i = 0; i < 9; i++){
+      if (tenErrors[i + 1] > tenErrors[biggest]) {
+        biggest = i + 1;
+      }
+    }
+    tenErrors[biggest] = 0;
+    biggest = 0;
+    for (int i = 0; i < 9; i++){
+      if (tenErrors[i + 1] > tenErrors[biggest]){
+        biggest = i + 1;
+      }
+    }
+    tenErrors[biggest] = 0;
+    float ErrorSum = 0;
+    for (int i = 0; i < 10; i++) {
+      ErrorSum += tenErrors[i];
+    }
+    Serial.print("average best of best 8 out of 10: ");
+    Serial.println(ErrorSum / 8);
+    printAvg = false;
+    for (int i = 0; i < 10; i++){
+      Serial.println(tenErrors[i]);
+    }
+  }
 }

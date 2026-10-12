@@ -144,12 +144,12 @@ void loop() {
     }
 
     if (b % 100 == 0) {
-      Serial.print("time in ms: ");
-      Serial.print(b - t0);
+      // Serial.print("time in ms: ");
+      // Serial.print(b - t0);
 
-      Serial.print("  spontaneous speed from builtin encoder:  ");
+      // Serial.print("  spontaneous speed from builtin encoder:  ");
       rpmm = (s_2 / (2 * 114)) * 600;  //formulation for rpm in each 100ms for PI controller
-      Serial.println(rpmm);
+      // Serial.println(rpmm);
       s_2 = 0;  //reseting the counters of PI controller rpm meter
 
       if ((b - t0) % 5000 == 0) {
