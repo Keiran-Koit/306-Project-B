@@ -1,4 +1,4 @@
-// Base code variable declarations
+/* Base code variable declarations */
 
 float deg = 45;  // Rotation degree
 float s = 0;     //Encoder counts
@@ -14,18 +14,13 @@ int t0 = 0;  //memory for time in ms
 int finish = 0;  //finish indicator
 int rep = 1;     //Repetition indicator
 
-// End of base code variable declarations
+/* End of base code variable declarations */
 /* -------------------------------------------------------------------- */
-// Custom variable declarations
+/* Custom variable declarations */
 
-#define THRESHOLD 150
+#define THRESHOLD 150     // Minimum value read at an analog to confirm LED detected by sensor
 
-/*byte grayCode[] = {
-  0b00000000, 0b00000001, 0b00000011, 0b00000010, 0b00000110, 0b00000111, 0b00000101, 0b00000100,
-  0b00001100, 0b00001101, 0b00001111, 0b00001110, 0b00001010, 0b00001011, 0b00001001, 0b00001000,
-  0b00011000, 0b00011001, 0b00011011, 0b00011010, 0b00011110, 0b00011111, 0b00011101, 0b00011100,
-  0b00010100, 0b00010101, 0b00010111, 0b00010110, 0b00010010, 0b00010011, 0b00010001, 0b00010000
-};*/
+// Lookup table represents each state that can be read by the sensors in clockwise order
 byte grayCode[] = {
   0b00000000, 0b00001000, 0b00011000, 0b00011010, 0b00001010, 0b00000010, 0b00010010, 0b00010110,
   0b00000110, 0b00001110, 0b00011110, 0b00011111, 0b00001111, 0b00000111, 0b00010111, 0b00010011,
@@ -37,21 +32,21 @@ int Sensor2 = A1;
 int Sensor3 = A2;
 int Sensor4 = A3;
 int Sensor5 = A4;  // Outermost Sensor
-int sensor1val, sensor2val, sensor3val, sensor4val, sensor5val;
-byte startPos = 0b00000000;
+int sensor1val, sensor2val, sensor3val, sensor4val, sensor5val;   // Values read at the analog pins connected to each sensor
+byte startPos = 0b00000000;       // byte values correspond to angular displacements, as defined in the lookup table
 byte prevPos = 0b00000000;
 byte currPos = 0b00000000;
 byte endPos = 0b00000000;
-int prevIndex, currIndex;
-double absTheta, relTheta;
-String dirn;
-float tenErrors[10];
-bool printAvg = true;
+int prevIndex, currIndex;         // The binary read by the sensors will correspond to an index in the lookup table
+double absTheta, relTheta;        // The index in the lookup table will correspond to an angle or angular change
+String dirn;        // Direction of motor spin (CW or CCW)
+float tenErrors[10];      // Array stores the error measured after each of the 10 rotations
+bool printAvg = true;     // Boolean to ensure we only print the average error once at the end
 
-// End of custom variables
+/* End of custom variable declarations */
 
 void setup() {
-  // Base code setup
+  /* Base code setup */
 
   Serial.begin(250000);  //Baud rate of communication
   Serial.println("Enter the desired rotation in degree.");
@@ -65,30 +60,38 @@ void setup() {
   }
   deg = abs(deg);
 
-  // End of base code setup
+  /* End of base code setup */
   /* -------------------------------------------------------------------- */
-  // Custom setup
-
+  /* Custom setup */
+  
+  // Defining all of the sensor pins as inputs
   sensor1val = analogRead(Sensor1);
   sensor2val = analogRead(Sensor2);
   sensor3val = analogRead(Sensor3);
   sensor4val = analogRead(Sensor4);
   sensor5val = analogRead(Sensor5);
+
+  // Reading the initial sensor values to determine the initial position of the wheel
   (sensor1val > THRESHOLD) ? startPos |= (1 << 0) : startPos &= ~(1 << 0);
   (sensor2val > THRESHOLD) ? startPos |= (1 << 1) : startPos &= ~(1 << 1);
   (sensor3val > THRESHOLD) ? startPos |= (1 << 2) : startPos &= ~(1 << 2);
   (sensor4val > THRESHOLD) ? startPos |= (1 << 3) : startPos &= ~(1 << 3);
   (sensor5val > THRESHOLD) ? startPos |= (1 << 4) : startPos &= ~(1 << 4);
-  currPos = startPos;
+  currPos = startPos;   // Set the current position to be the starting position
+  
+  // Search through the lookup table to determine the index of the current position
   for (int i = 0; i < 32; i++) {
     if (grayCode[i] == currPos) {
       currIndex = i;
       break;
     }
   }
+
+  // Convert the current index to a current position (360 degrees / 32 indexed positions = 11.25 degrees/index)
+  // Note: 0 degrees is defined as 00000, or when all of the sensors are seeing a the solid part of the wheel
   absTheta = currIndex * 11.25;
 
-  // End of custom setup
+  /* End of custom setup */
 }
 
 float kp = .6 * 90 / deg;  //proportional gain of PI
@@ -99,10 +102,13 @@ void loop() {
   t = millis();  //reading time
   t0 = t;        //saving the current time in memory
 
-  // Custom code
+  /* Custom code */
+
+  // Update the previous positions to compare against current ones later
   prevPos = currPos;
   prevIndex = currIndex;
-  // End of custom code
+
+  /* End of custom code */
 
   while (t < t0 + 4000 && rep <= 10) {  // let the code run for 4 seconds each with 10 repetitions
     if (t % 10 == 0) {                  //PI controller that runs every 10ms
@@ -138,18 +144,23 @@ void loop() {
     delay(500);       //half second delay
     rep = rep + 1;    // increasing the repetition indicator
 
-    // Custom sensing
-
+    /* Custom sensing */
+    
+    // Read the raw analog values of the sensors
     sensor1val = analogRead(Sensor1);
     sensor2val = analogRead(Sensor2);
     sensor3val = analogRead(Sensor3);
     sensor4val = analogRead(Sensor4);
     sensor5val = analogRead(Sensor5);
+
+    // If a sensor is seeing the LED its currPos bit is set to 1, otherwise it is set to 0
     (sensor1val > THRESHOLD) ? currPos |= (1 << 0) : currPos &= ~(1 << 0);
     (sensor2val > THRESHOLD) ? currPos |= (1 << 1) : currPos &= ~(1 << 1);
     (sensor3val > THRESHOLD) ? currPos |= (1 << 2) : currPos &= ~(1 << 2);
     (sensor4val > THRESHOLD) ? currPos |= (1 << 3) : currPos &= ~(1 << 3);
     (sensor5val > THRESHOLD) ? currPos |= (1 << 4) : currPos &= ~(1 << 4);
+
+    // Search through the lookup table to determine the index of the current position
     for (int i = 0; i < 32; i++) {
       if (grayCode[i] == currPos) {
         currIndex = i;
@@ -157,17 +168,23 @@ void loop() {
       }
     }
 
+    // Convert the current index position to angle in degrees
     absTheta = currIndex * 11.25;
-    if ((currIndex - prevIndex) > 16) {
-      relTheta = (currIndex - prevIndex - 32) * 11.25;
-    } else if ((currIndex - prevIndex) < -16) {
-      relTheta = (currIndex - prevIndex + 32) * 11.25;
-    } else {
-      relTheta = (currIndex - prevIndex) * 11.25;
-    }
-    dirn = (relTheta > 0) ? "CW" : "CCW";  // NEED TO CHECK THESE DIRECTIONS
 
-    // End of custom sensing
+    // If we overflow past the beginning/end of the lookup table need to add/subtract 360 degrees
+    // which is equivalent to 32 index positions
+    if ((currIndex - prevIndex) > 16) {               // Overflowed past the beginning of the table (ccw)
+      relTheta = (currIndex - prevIndex - 32) * 11.25;    // Must subtract 32 index values (360 degrees)
+    } else if ((currIndex - prevIndex) < -16) {       // Overflowed past the end of the table (cw)
+      relTheta = (currIndex - prevIndex + 32) * 11.25;    // Must add 32 index values (360 degrees)
+    } else {                                          // No overflow case
+      relTheta = (currIndex - prevIndex) * 11.25;         // Compute angular difference as normal
+    }
+
+    // A positive relative angular change indicates clockwise rotation
+    dirn = (relTheta > 0) ? "CW" : "CCW";
+
+    /* End of custom sensing */
 
     Serial.print("shaft position from optical absolute sensor from home position: ");
     Serial.println(absTheta);
@@ -186,33 +203,41 @@ void loop() {
     s = 0;
     finish = 0;
 
-    tenErrors[rep - 2] = abs(Error);
+    tenErrors[rep - 2] = abs(Error);    // Store each of the angular displacement errors (rep 2 = index 0)
   }
   analogWrite(6, 0);  //turning off the motor
-  if(printAvg && rep == 11) {
-    int biggest = 0;
+  
+  // Calculating and outputting the best 8 out of 10 average error 
+  if(printAvg && rep == 11) {   // If the rotations are finished and we haven't yet outputted the avg error
+    
+    int biggest = 0; // represents the index of our largest error
+
+    // Loop through the array to determine the index of the largest error
     for (int i = 0; i < 9; i++){
       if (tenErrors[i + 1] > tenErrors[biggest]) {
         biggest = i + 1;
       }
     }
-    tenErrors[biggest] = 0;
-    biggest = 0;
+    tenErrors[biggest] = 0;     // Remove the largest error value by setting it to 0
+
+    // Loop through the array again to determine the index of the next largest error
     for (int i = 0; i < 9; i++){
       if (tenErrors[i + 1] > tenErrors[biggest]){
         biggest = i + 1;
       }
     }
-    tenErrors[biggest] = 0;
+    tenErrors[biggest] = 0;   // Remove the second largest error value by setting it to 0
+
+    // Calculate the sum of the remaining 8 errors in our array (best 8 out of 10)
     float ErrorSum = 0;
     for (int i = 0; i < 10; i++) {
       ErrorSum += tenErrors[i];
     }
+
+    // Output the average of these 8 errors
     Serial.print("average best of best 8 out of 10: ");
     Serial.println(ErrorSum / 8);
-    printAvg = false;
-    for (int i = 0; i < 10; i++){
-      Serial.println(tenErrors[i]);
-    }
+
+    printAvg = false;   // Set to false so we don't keep looping through this section
   }
 }
