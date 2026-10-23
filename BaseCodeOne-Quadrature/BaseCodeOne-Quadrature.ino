@@ -1,4 +1,4 @@
-// Base code variable declarations
+/* Base code variable declarations */
 
 int b = 0;  //reading the time for main loop to be run for 15s
 int c = 0;  //memory for the time in mainloop
@@ -27,37 +27,36 @@ int repc = 1;    //repetition condition of PI controller
 int t0;          //memory of time for the Purpose of displaying the results
 int repeat = 0;  //repeat indicator to only let the memory of time for the Purpose of displaying the results be updated once
 
-// End of base code variable declarations
+/* End of base code variable declarations */
 /* -------------------------------------------------------------------- */
-// Custom variable declarations
+/* Custom variable declarations */
 
-#define THRESHOLD 150
+#define THRESHOLD 150     // Minimum value read at an analog to confirm LED detected by sensor
 
 int Sensor1 = A5;       // Bottom (only quad)
 int Sensor2 = A4;       // Top (used in both quad and absolute)
-int analogSensor1, analogSensor2;
-bool currSensor1, currSensor2;
-bool prevSensor1 = false;
+int analogSensor1, analogSensor2;   // Values read at the analog pins connected to each sensor
+bool currSensor1, currSensor2;      // TRUE if the sensor sees the LED, FALSE if not
+bool prevSensor1 = false;     // Record the last value read by the sensor for edge counting
 bool prevSensor2 = false;
-double edgeCount = 0;
-double avgSpeed;
-int cwCount = 0;
+double edgeCount = 0;         // Keep track of how many edges have been detected within a time window
+double avgSpeed;              // Average speed of the motor (rpm)
+int cwCount = 0;          // Count the number of clockwise and counterclockwise edge detections
 int ccwCount = 0;
-String dirn;
+String dirn;          // Direction of motor spin (CW or CCW)
 
-// End of custom variable declarations
-/* -------------------------------------------------------------------- */
+/* End of custom variable declarations */
 
 void setup() {
-  /* -------------------------------------------------------------------- */
-  // Custom setup
+  /* Custom setup */
   
-  pinMode(A4, INPUT);
-  pinMode(A5, INPUT);
+  // Defining both of the sensor pins as inputs
+  pinMode(Sensor2, INPUT);
+  pinMode(Sensor1, INPUT);
   
-  // End of custom setup
+  /* End of custom setup */
   /* -------------------------------------------------------------------- */
-  // Base code setup
+  /* Base code setup */
   
   Serial.begin(250000);  //Baud rate of communication
 
@@ -73,8 +72,7 @@ void setup() {
   }
   RPM = abs(RPM);
 
-  // End of base code setup
-  /* -------------------------------------------------------------------- */
+  /* End of base code setup */
 }
 
 
@@ -84,33 +82,38 @@ void loop() {
 
   while ((b >= c) && (b <= (c + 15500)) && exitt == 0)  //let the main loop to be run for 15s
   {
-    /* -------------------------------------------------------------------- */
-    // Custom sensing
+    /* Custom sensing */
 
+    // Read the raw analog values at each sensors analog pin
     analogSensor1 = analogRead(Sensor1);
     analogSensor2 = analogRead(Sensor2);
-    currSensor1 = (analogSensor1 > THRESHOLD) ? true : false;       // Sensor true if it's seeing light
+
+    // currSensor is true if it is seeing light from the LED, false if it is not
+    currSensor1 = (analogSensor1 > THRESHOLD) ? true : false;
     currSensor2 = (analogSensor2 > THRESHOLD) ? true : false;
-    (currSensor1 != prevSensor1) ? edgeCount++ : edgeCount += 0;    // If sensor has seen an edge, increase the count
+
+    // If the sensor has seen an edge, increment the edgeCount by 1
+    (currSensor1 != prevSensor1) ? edgeCount++ : edgeCount += 0;
     (currSensor2 != prevSensor2) ? edgeCount++ : edgeCount += 0;
     
     // Direction calculations
+    // Each time an edge is detected we check which way the wheel is spinning
     if (currSensor1 && !prevSensor1) {                // Sensor 1 rising edge
-      (currSensor2) ? cwCount++ : ccwCount++;
+      (currSensor2) ? cwCount++ : ccwCount++;         // Sensor 2 true -> clockwise, otherwise counterclockwise
     } else if (!currSensor1 && prevSensor1) {         // Sensor 1 falling edge
-      (currSensor2) ? ccwCount++ : cwCount++;
+      (currSensor2) ? ccwCount++ : cwCount++;         // Sensor 2 true -> ccw, otherwise cw
     }
     if (currSensor2 && !prevSensor2) {                // Sensor 2 rising edge
-      (currSensor1) ? ccwCount++ : cwCount++;
+      (currSensor1) ? ccwCount++ : cwCount++;         // Sensor 1 true -> ccw, otherwise cw
     } else if (!currSensor2 && prevSensor2) {         // Sensor 2 falling edge
-      (currSensor1) ? cwCount++ : ccwCount++;
+      (currSensor1) ? cwCount++ : ccwCount++;         // Sensor 1 true -> cw, otherwise ccw
     }
 
+    // Update the values of previous sensor so they can be compared with on the next loop iteration
     prevSensor1 = currSensor1;
     prevSensor2 = currSensor2;
 
-    // End of custom sensing
-    /* -------------------------------------------------------------------- */
+    /* End of custom sensing */
 
     if (b % 13 == 0 && repc == 1)  //PI controller
     {
@@ -144,12 +147,12 @@ void loop() {
     }
 
     if (b % 100 == 0) {
-      Serial.print("time in ms: ");
-      Serial.print(b - t0);
+      // Serial.print("time in ms: ");
+      // Serial.print(b - t0);
 
-      Serial.print("  spontaneous speed from builtin encoder:  ");
+      // Serial.print("  spontaneous speed from builtin encoder:  ");
       rpmm = (s_2 / (2 * 114)) * 600;  //formulation for rpm in each 100ms for PI controller
-      Serial.println(rpmm);
+      // Serial.println(rpmm);
       s_2 = 0;  //reseting the counters of PI controller rpm meter
 
       if ((b - t0) % 5000 == 0) {
@@ -157,9 +160,10 @@ void loop() {
         Serial.print("RPM from builtin encoder: ");
         Serial.println((s / (228)) * 12);  //formula for rpm in each 5s
 
-        avgSpeed = ((edgeCount / 32) / ((b-c)/1000)) * 60;    // 32 edges per revolutions, divided by elapsed time in seconds, converted to rpm
+        avgSpeed = ((edgeCount / 32) / 5) * 60;    // 32 edges per revolutions, measured over 5s, converted to rpm
         Serial.print("RPM from optical quadrature encoder: ");
         Serial.println(avgSpeed);
+        edgeCount = 0;      // Resetting the edge count after each 5s interval
 
         Serial.print("Error: ");
         Serial.println(avgSpeed - (s / (228)) * 12);
@@ -172,7 +176,8 @@ void loop() {
         }
         Serial.print("  ,   ");
 
-        dirn = (cwCount > ccwCount) ? "CW" : "CCW";   // Checking motor direction
+        // Checking motor direction by checking if we had more cw or ccw edge detections
+        dirn = (cwCount > ccwCount) ? "CW" : "CCW";
         Serial.print("direction read by sensor:  ");
         Serial.println(dirn);
         Serial.println();
@@ -204,23 +209,6 @@ void loop() {
     b = millis();  //updating time
   }
   analogWrite(6, 0);  //turning off the motor
-
-  //--------------------------------------------------------------------
-  // Custom code
-  /*
-  if (exitt == 0) {       // Only output the speed once
-    avgSpeed = ((edgeCount / 32) / 10) * 60;  // 32 edges per revolutions, measured over 10 seconds, converted to rpm
-    Serial.print("edge count: ");
-    Serial.println(edgeCount);
-    Serial.print("The measured speed was: ");
-    Serial.print(avgSpeed);
-    Serial.print(" rpm, ");
-    dirn = (cwCount > ccwCount) ? "CW" : "CCW";
-    Serial.println("turning " + dirn);
-  }
-*/
-  // End of custom code
-  //--------------------------------------------------------------------
 
   exitt = 1;          //changing the exit condition to prevent the motor to run after 15s
 }
